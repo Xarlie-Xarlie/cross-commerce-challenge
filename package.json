@@ -1,0 +1,19 @@
+{
+  "name": "cross_commerce_chalange",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.24.0",
+    "node-fetch": "2",
+    "typescript": "^4.5.2"
+  },
+  "scripts": {
+    "build": "tsc index.ts",
+    "tsc": "ts-node-dev index.ts"
+  },
+  "devDependencies": {
+    "@types/node-fetch": "^3.0.3",
+    "ts-node-dev": "^1.1.8"
+  }
+}
