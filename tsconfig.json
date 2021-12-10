@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
+    "esModuleInterop": true,
     "outDir": "./",
     "sourceMap": false,
     "noImplicitAny": false,
     "module": "commonjs",
-    "target": "es2015"
+    "target": "es2020"
   },
   "exclude": ["node_modules"],
-  "lib": ["ES5", "ES2015", "DOM", "ScriptHost"]
+  "lib": ["ES2020"] //"ES5", "ES2015", "DOM", "ScriptHost"
 }
