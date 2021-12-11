@@ -5,7 +5,8 @@
     "sourceMap": false,
     "noImplicitAny": false,
     "module": "commonjs",
-    "target": "es2020"
+    "target": "es2020",
+    "resolveJsonModule": true
   },
   "exclude": ["node_modules"],
   "lib": ["ES2020"] //"ES5", "ES2015", "DOM", "ScriptHost"
