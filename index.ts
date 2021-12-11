@@ -1,230 +1,135 @@
-import axios from 'axios';
 import cluster from 'cluster';
 import { cpus } from 'os';
+import { requestData, api_URL } from './extract';
+import { mergeSortTopDown } from './transform';
 import process from 'process';
-
-export const api_URL = 'http://challenge.dienekes.com.br/api/numbers';
 const numCPUs = cpus().length;
 
-async function retry<T>(
-  fetchData: () => Promise<T>,
-  maxRetries: number
-): Promise<T> {
-  let lastError: any;
-  for (let index = 0; index < maxRetries; index++) {
-    try {
-      return await fetchData();
-    } catch (e) {
-      lastError = e;
-    }
-  }
-  // console.log('Error during fetch, max tries reached');
-  throw lastError;
+interface dataProcess {
+  message: string;
+  fromPage: number;
+  toPage: number;
+  lastPage: number;
 }
 
-async function requestData(url: string, startPage: number, endPage: number) {
-  let requests = [];
-  let result = [];
-  let hasPages = true;
-  let currentPage = startPage;
+// let teste = [
+//   [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+//   [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+//   [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+//   [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+//   [1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+// ];
 
-  do {
-    requests.push(retry(() => axios.get(`${url}?page=${currentPage}`), 10));
-    if (currentPage % 10000 === 0 || currentPage === endPage) {
-      console.log(
-        `Worker ${process.pid} is awaiting pages of ${startPage} to ${endPage}`
-      );
-      let response = await Promise.allSettled(requests);
-      // response.forEach(element => {});
-      result.push(
-        response.filter(element => {
-          if (
-            element.status === 'fulfilled' &&
-            element.value.data.numbers.length !== 0
-          )
-            return element.value.data;
-          else if (
-            element.status === 'fulfilled' &&
-            element.value.data.numbers.length === 0 &&
-            hasPages
-          ) {
-            hasPages = false;
-            return false;
-          } else if (element.status === 'rejected') {
-            // console.log('Promise Rejected!');
-            // console.log(element);
-            return false;
-          }
-        })
-      );
-      requests = [];
-    }
-    currentPage++;
-  } while (hasPages && currentPage <= endPage);
-
-  let totalReceived = 0;
-  result.forEach(element => (totalReceived += element.length));
-  console.log(
-    `total of objects received from Data: ${totalReceived}, pages requesteds=${
-      endPage - startPage + 1
-    }`
-  );
-  return { result, hasPages };
-}
-
-interface dataWorker {
-  result: [];
-  hasPages: boolean;
-  currentPage: number;
-}
+// var newArray = [];
+// teste.forEach(element => {
+//   element.forEach(item => newArray.push(item));
+// });
+// teste = [...newArray];
 
 if (cluster.isPrimary) {
-  const resultFinal = [];
+  //log Main Thread process
   console.log(`Primary ${process.pid} is running`);
 
-  let newWorker;
-  cluster.on('online', function (worker) {
-    console.log('Worker ' + worker.process.pid + ' is online');
-  });
+  const requests = []; // array to save requests
 
   // Fork workers.
-  let lastPage = -1;
+  var worker;
+  var lastPage = -1;
   for (let i = 0; i < numCPUs; i++) {
     if (i === numCPUs - 1) lastPage = 2500 + i * 2500;
-    let worker = cluster.fork();
+    // send a message to workers make the request with 2500 pages
+    worker = cluster.fork();
+
     worker.send({
+      // since my cpu has 4 cores, i use 10000/numcpus = 2500 pages per core
       message: 'get data from api',
       fromPage: 2500 * i + 1,
       toPage: 2500 + i * 2500,
       lastPage: lastPage,
     });
+
+    worker.on('message', data => {
+      if (data.result) {
+        data.result.forEach(element => {
+          element.forEach(item => requests.push(item));
+        });
+      }
+    });
   }
 
   cluster.on('exit', function (worker, code, signal) {
-    console.log(
-      'Worker ' +
-        worker.process.pid +
-        ' died with code: ' +
-        code +
-        ', and signal: ' +
-        signal
-    );
+    if (signal) {
+      console.log(
+        'Worker ' +
+          worker.process.pid +
+          ' died with code: ' +
+          code +
+          ', and signal: ' +
+          signal
+      );
+    }
+
     if (code === 2) {
-      console.log('Starting a new worker');
-      newWorker = cluster.fork();
-      newWorker.send({
+      // if code is 2 it means that we don't get an empty array from requests
+      cluster.fork().send({
         message: 'still have data to request',
         fromPage: lastPage,
         toPage: lastPage + 2500,
         lastPage: lastPage + 2500,
       });
+      lastPage += 2500;
     }
-  });
-
-  cluster.on('message', (data: dataWorker) => {
-    resultFinal.push(data.result);
+    if (code === 3) {
+      console.log(`requests.length: ${requests.length}`);
+      console.time('Time to sort items with MergeSort');
+      var sortedrequests = mergeSortTopDown(requests);
+      console.timeEnd('Time to sort items with MergeSort');
+      console.log(sortedrequests);
+    }
   });
 } else {
-  // console.log(`Worker ${process.pid} started ${cluster.worker.id}`);
-  interface dataProcess {
-    message: string;
-    fromPage: number;
-    toPage: number;
-    lastPage: number;
-  }
-
   process.on('message', async (data: dataProcess) => {
-    // console.log(`Worker ${process.pid} started to fetch data.`);
     if (data.message === 'get data from api') {
-      let { result, hasPages } = await requestData(
+      // request data in child process
+      var { result, hasPages } = await requestData(
         api_URL,
         data.fromPage,
         data.toPage
       );
-      result = result[0].map(element => element.value.data);
-      process.send({ result, hasPages, currentPage: data.toPage });
-      if (hasPages && data.toPage === data.lastPage) process.exit(2);
-      process.exit(0);
+
+      if (result.length > 0) {
+        result = result[0].map(element => element.value.data.numbers);
+        process.send({ result });
+      }
+
+      // if still have pages the process will restart
+      if (hasPages) process.exit(2);
+      // if doesn't have, it will just log the receive data
+      else if (!hasPages && result.length > 0) {
+        process.exit(0);
+      }
+      // it has no data remaining
+      else process.exit(3);
     } else if (data.message === 'still have data to request') {
+      // request data in process
       let { result, hasPages } = await requestData(
         api_URL,
         data.fromPage,
         data.toPage
       );
-      result = result[0].map(element => element.value.data);
-      process.send({ result, hasPages, currentPage: data.toPage });
-      if (hasPages && data.toPage === data.lastPage) process.exit(2);
-      process.exit(0);
+
+      if (result.length > 0) {
+        result = result[0].map(element => element.value.data.numbers);
+        process.send({ result });
+      }
+
+      // if still have pages to request the process will restart
+      if (hasPages) process.exit(2);
+      // if doesn't, it will just log the receive data
+      else if (!hasPages && result.length > 0) {
+        // console.log(resultFinal);
+        process.exit(3);
+      } else process.exit(0); // it has no data remaining
     }
   });
 }
-/*
-
-async function requestLucas() {
-  const responses = [];
-  let hasPages = true;
-  let currentPage = 1;
-  do {
-    const response = await retry(
-      () => axios.get(`${api_URL}?page=${currentPage}`),
-      10
-    );
-    if (!response.data.numbers.length) {
-      hasPages = false;
-    }
-    // if (currentPage % 100 === 0) console.log(`At page ${currentPage}`);
-    responses.push(response.data);
-    currentPage++;
-  } while (hasPages);
-  // console.log(responses);
-  // responses.forEach(Element => {
-  //   console.log(Element);
-  // });
-  console.log(`responses.length: ${responses.length}`);
-  console.log(
-    `total of objects received from Lucas: ${
-      responses.length
-    }, requests made: ${currentPage - 1}`
-  );
-  return responses;
-}
-  switch (cluster.worker.id) {
-    case 1:
-      // console.log(`started main ${cluster.worker.id}`);
-      main(1, 2500)
-        .then(() => process.exit(0))
-        .catch(err => {
-          console.log(err);
-          process.exit(1);
-        });
-      break;
-
-    case 2:
-      // console.log(`started main ${cluster.worker.id}`);
-      main(2501, 5000)
-        .then(() => process.exit(0))
-        .catch(err => {
-          console.log(err);
-          process.exit(1);
-        });
-      break;
-    case 3:
-      // console.log(`started main ${cluster.worker.id}`);
-      main(5001, 7500)
-        .then(() => process.exit(0))
-        .catch(err => {
-          console.log(err);
-          process.exit(1);
-        });
-      break;
-
-    case 4:
-      // console.log(`started main ${cluster.worker.id}`);
-      main(7501, 10000)
-        .then(() => process.exit(0))
-        .catch(err => {
-          console.log(err);
-          process.exit(1);
-        });
-      break;
-  }*/
