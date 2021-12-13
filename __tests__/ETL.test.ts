@@ -8,22 +8,22 @@ describe('Extract', () => {
   it('Should be able to request 250 pages without errors', async () => {
     const { result } = await requestData(api_URL, 1, 250);
     expect(result[0]).toHaveLength(250);
-  }, 60000);
+  }, 90000);
 
   it('Should be able to successfully request pages, even if some of them have errors', async () => {
     const { result } = await requestData(api_URL, 1, 250, 1);
     expect(result[0].length).toBeLessThanOrEqual(250);
-  }, 60000);
+  }, 90000);
 
   it('Should be able to stop request from api when receive an empty array', async () => {
     var { hasPages } = await requestData(api_URL, 9990, 10010);
     expect(hasPages).toBeFalsy();
-  }, 60000);
+  }, 90000);
 
   it(`Should be able to request more data from api when don't receive an empty array`, async () => {
     var { hasPages } = await requestData(api_URL, 9970, 9990);
     expect(hasPages).toBeTruthy();
-  }, 60000);
+  }, 90000);
 });
 
 describe('Transform', () => {

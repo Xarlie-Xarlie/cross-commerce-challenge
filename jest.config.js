@@ -3,6 +3,7 @@ module.exports = {
   resetMocks: true,
   clearMocks: true,
   testMatch: ['**/__tests__/**/*.test.ts?(x)'],
+  setupFilesAfterEnv: ['<rootDir>/__tests__/setup.js'],
 
   moduleFileExtensions: ['ts', 'tsx', 'js'],
   transform: {
