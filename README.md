@@ -35,19 +35,19 @@ Running the command below will start the app. it references to `index.ts` file.
 
 My app Starts to fetch data from the API instaneosly, after receive, sort it, and then start a server express to allow send data with an API REST.
 
-### How do i _Extract_ the data?
+### How do I _Extract_ the data?
 
 - I use `cluster` module from node, to create a main process and 4 more child process to run in separeted threads in paralel. Each child process requests a number of 1000 pages and then saves the requested data to main process (`Primary`).
 - If the child didn't receive an empty array, it means that there are still more pages to be requested. The child tells `Primary` alocate a new child process to request remaining data.
 - All the communications are done via messages from the `cluster` modules. which are available in the `NodeJS` documentation.
 - To handle with shared resources, each child process saves received data in the same array. I've use semaphores, to prevent the same resourcefrom being accessed by two differents process.
 
-### How do i _Transform_ the data?
+### How do I _Transform_ the data?
 
 - To sort the data i used the Quick Sort Algorithm, which is found in the literature. Sorting algorithm are very famous and have anothers with other characteristics, but Quick Sort was a good choice to solve this challenge.
 - I chose Quick Sort because it has a time complexity of **$n*log(n)$** on average and best case, and the memory comsumption of **$log(n)$**, Where n is the number of elements.
 
-### how do i _Load_ the data?
+### How do I _Load_ the data?
 
 - To load the transformed data, i just start a server with `Express JS`, and a **GET** method can be used to get the data.
 - **`/transform`** is the route to get the sorted data.
