@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
+    // "allowSyntheticDefaultImports": true,
     "outDir": "./",
     "sourceMap": false,
     "noImplicitAny": false,
     "module": "commonjs",
-    "target": "es2020",
-    "resolveJsonModule": true
+    "target": "es6",
+    "resolveJsonModule": true,
+    "moduleResolution": "Node"
   },
   "exclude": ["node_modules"],
-  "lib": ["ES2020"] //"ES5", "ES2015", "DOM", "ScriptHost"
+  "lib": ["ES6"] //, "ES5", "ES2015", "DOM", "ScriptHost"]
 }

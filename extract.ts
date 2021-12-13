@@ -1,78 +1,72 @@
 import axios from 'axios';
 import process from 'process';
 
-export const api_URL = 'http://challenge.dienekes.com.br/api/numbers';
-
-export async function retryRequest<T>(
+// retry requests based on maxRetries
+async function requestWithRetry<T>(
   fetchData: () => Promise<T>,
-  maxRetries: number
+  maxOfTries: number
 ): Promise<T> {
   let lastError: any;
-  for (let index = 0; index < maxRetries; index++) {
+  for (let numberOfTries = 0; numberOfTries < maxOfTries; numberOfTries++) {
     try {
       return await fetchData();
     } catch (e) {
       lastError = e;
     }
   }
-  // console.log('Error during fetch, max tries reached');
   throw lastError;
 }
 
+// request data from start page to end page
 export async function requestData(
   url: string,
   startPage: number,
-  endPage: number
+  endPage: number,
+  numberOfTries = 5
 ) {
-  let requests = [];
-  let result = [];
-  let hasPages = true;
+  let requests = []; // save requests made
+  let result = []; // results from Promises requests
+  let hasPages = true; // still has pages to request
   let currentPage = startPage;
 
   do {
+    // save requests on array
     requests.push(
-      retryRequest(() => axios.get(`${url}?page=${currentPage}`), 10)
+      requestWithRetry(
+        () => axios.get(`${url}?page=${currentPage}`),
+        numberOfTries
+      )
     );
+    // await 10000 or the number of requests
     if (currentPage % 10000 === 0 || currentPage === endPage) {
       console.log(
-        `Worker ${process.pid} is awaiting pages of ${startPage} to ${endPage}`
+        `Worker ${process.pid} is awaiting data from page ${startPage} to page ${endPage} `
       );
+      // await to finish requests
       let response = await Promise.allSettled(requests);
-      // response.forEach(element => {});
+
+      // save finished requests
       result.push(
+        // filter the sucessfully results
         response.filter(element => {
           if (
             element.status === 'fulfilled' &&
             element.value.data.numbers.length !== 0
-          )
+          ) {
             return element.value.data;
-          else if (
+          } else if (
             element.status === 'fulfilled' &&
             element.value.data.numbers.length === 0 &&
             hasPages
           ) {
             hasPages = false;
             return false;
-          } else if (element.status === 'rejected') {
-            // console.log('Promise Rejected!');
-            // console.log(element);
-            return false;
-          }
+          } else return false;
         })
       );
-      requests = [];
+      requests = []; // clear requests done
     }
     currentPage++;
   } while (hasPages && currentPage <= endPage);
-
-  let totalReceived = 0;
-  result.forEach(element => (totalReceived += element.length));
-  console.log(
-    `Worker ${
-      process.pid
-    } received from Api: ${totalReceived}, pages requesteds=${
-      endPage - startPage + 1
-    }`
-  );
   return { result, hasPages };
 }
